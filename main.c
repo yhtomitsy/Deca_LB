@@ -170,11 +170,17 @@ static float q0,q1,q2,q3;                                		// quaternions q0 = q
 static float h_est;                                      		// heading accurracy estimation
 static uint8_t stat_;                                    		// Status (0-3)
 static uint8_t cargo[23] = {0}; 														// holds in coming data
+
 static float quatI = 0;
 static float quatJ = 0;
 static float quatK = 0;
 static float quatReal = 0;
-static bool reset = false;
+static float quatI_Prev = 0;
+static float quatJ_Prev = 0;
+static float quatK_Prev = 0;
+static float quatReal_Prev = 0;
+
+static bool reset = false;																	
 static bool requestID = false;
 uint8_t i2C_event = 0;
 uint8_t str[20]; 																						// Holds the string from the IMU
@@ -753,7 +759,7 @@ void initializeIMU(){
     }
 		SEGGER_RTT_printf(0,"\nIMU Available!\r\n");
 		nrf_delay_ms(100);
-		if(setFeature(SENSOR_REPORTID_ROTATION_VECTOR, 100, 0))
+		if(setFeature(SENSOR_REPORTID_ROTATION_VECTOR, 1, 0))
 		{
 				SEGGER_RTT_printf(0,"\nQuats set\r\n");
 		}
@@ -896,9 +902,16 @@ int main(void)
     for (;;)
     {
 				get_QUAT();
-				sprintf((char*)&str[0], "%3.2f,%3.2f,%3.2f,%3.2f", quatReal, quatI, quatJ, quatK);
-				if(TX_Complete)sendData(str, sizeof(str));
-				nrf_delay_ms(10);
+				if(quatReal != quatReal_Prev && quatI != quatI_Prev && quatJ != quatJ_Prev && quatK != quatK_Prev)
+				{
+						sprintf((char*)&str[0], "%3.2f,%3.2f,%3.2f,%3.2f", quatReal, quatI, quatJ, quatK);
+						if(TX_Complete)sendData(str, sizeof(str));
+						quatReal_Prev = quatReal;
+						quatI_Prev = quatI;
+						quatJ_Prev = quatJ;
+						quatK_Prev = quatK;
+				}
+				//nrf_delay_ms(1);
         power_manage();
     }
 }
