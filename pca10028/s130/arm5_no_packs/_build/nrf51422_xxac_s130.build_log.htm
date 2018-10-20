@@ -36,14 +36,16 @@ compiling main.c...
   void resetIMU();                                            // reset the IMU
 ..\..\..\main.c(187): warning:  #1295-D: Deprecated declaration requestProductID - give arg types
   void requestProductID();                                    // request the product ID
-..\..\..\main.c(673): warning:  #177-D: variable "s" was declared but never referenced
+..\..\..\main.c(695): warning:  #177-D: variable "s" was declared but never referenced
   		int s = 0;
-..\..\..\main.c(722): warning:  #550-D: variable "err_code" was set but never used
+..\..\..\main.c(744): warning:  #550-D: variable "err_code" was set but never used
   		ret_code_t err_code;
-..\..\..\main.c(743): warning:  #550-D: variable "err_code" was set but never used
+..\..\..\main.c(765): warning:  #550-D: variable "err_code" was set but never used
   		ret_code_t err_code;	
-..\..\..\main.c(744): warning:  #177-D: variable "reg" was declared but never referenced
+..\..\..\main.c(766): warning:  #177-D: variable "reg" was declared but never referenced
   		uint8_t reg[4] = {0, 0};
+..\..\..\main.c(866): warning:  #177-D: variable "erase_bonds" was declared but never referenced
+      bool erase_bonds;
 ..\..\..\main.c(169): warning:  #177-D: variable "q0" was declared but never referenced
   static float q0,q1,q2,q3;                                		// quaternions q0 = qw 1 = i; 2 = j; 3 = k;
 ..\..\..\main.c(169): warning:  #177-D: variable "q1" was declared but never referenced
@@ -62,13 +64,13 @@ compiling main.c...
   static void set_feature_cmd_QUAT(); 												// configure quaternion output
 ..\..\..\main.c(185): warning:  #177-D: function "sendPacket_IMU" was declared but never referenced
   static void sendPacket_IMU(uint8_t, uint8_t);               // send data to IMU
-..\..\..\main.c(654): warning:  #177-D: function "power_manage" was declared but never referenced
-  static void power_manage(void)
-..\..\..\main.c: 18 warnings, 0 errors
+..\..\..\main.c(658): warning:  #177-D: function "buttons_leds_init" was declared but never referenced
+  static void buttons_leds_init(bool * p_erase_bonds)
+..\..\..\main.c: 19 warnings, 0 errors
 linking...
-Program Size: Code=26720 RO-data=940 RW-data=376 ZI-data=7432  
+Program Size: Code=24328 RO-data=860 RW-data=356 ZI-data=6884  
 FromELF: creating hex file...
-".\_build\nrf51422_xxac_s130.axf" - 0 Error(s), 18 Warning(s).
+".\_build\nrf51422_xxac_s130.axf" - 0 Error(s), 19 Warning(s).
 
 <h2>Software Packages used:</h2>
 

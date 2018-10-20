@@ -188,7 +188,8 @@ void requestProductID();                                    // request the produ
 bool sendDataPacket(uint8_t, uint8_t);											// send data packet to IMU
 bool setFeature(uint8_t, uint16_t, uint32_t);								// set a feature on the IMU
 
-
+bool TX_Complete = false;
+const bool UART_EN = false;
 
 /**@brief Function for assert macro callback.
  *
@@ -411,12 +412,26 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
     switch (p_ble_evt->header.evt_id)
     {
         case BLE_GAP_EVT_CONNECTED:
+						
+						SEGGER_RTT_printf(0,"\r\nConnected!\r\n");
             err_code = bsp_indication_set(BSP_INDICATE_CONNECTED);
             APP_ERROR_CHECK(err_code);
             m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
+						TX_Complete = true;
+						if(UART_EN)
+						{
+								printf("*");
+								SEGGER_RTT_printf(0,"\r\nUART requested!\r\n");
+						}
+						else
+						{	
+								SEGGER_RTT_printf(0,"\r\nInitial data submission!\r\n");
+								sendData(str, sizeof(str));
+						}
             break;
             
         case BLE_GAP_EVT_DISCONNECTED:
+						SEGGER_RTT_printf(0,"\r\nDisconnected!\r\n");
             err_code = bsp_indication_set(BSP_INDICATE_IDLE);
             APP_ERROR_CHECK(err_code);
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
@@ -433,7 +448,9 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
             err_code = sd_ble_gatts_sys_attr_set(m_conn_handle, NULL, 0, 0);
             APP_ERROR_CHECK(err_code);
             break;
-
+				case BLE_EVT_TX_COMPLETE:
+						sendData(str, sizeof(str));
+						break;
         default:
             // No implementation needed.
             break;
@@ -548,7 +565,12 @@ void uart_event_handle(app_uart_evt_t * p_event)
 
             if ((data_array[index - 1] == '\n') || (index >= (BLE_NUS_MAX_DATA_LEN)))
             {
-                err_code = ble_nus_string_send(&m_nus, data_array, index);
+                if(TX_Complete)
+								{
+										err_code = ble_nus_string_send(&m_nus, data_array, index);
+										SEGGER_RTT_printf(0,"Data sent!\r\n");
+										TX_Complete =  false;
+								}
                 if (err_code != NRF_ERROR_INVALID_STATE)
                 {
                     APP_ERROR_CHECK(err_code);
@@ -581,11 +603,11 @@ static void uart_init(void)
     uint32_t                     err_code;
     const app_uart_comm_params_t comm_params =
     {
-        RX_PIN_NUMBER,
-        TX_PIN_NUMBER,
+        6,//RX_PIN_NUMBER,
+        5,//TX_PIN_NUMBER,
         RTS_PIN_NUMBER,
         CTS_PIN_NUMBER,
-        APP_UART_FLOW_CONTROL_ENABLED,
+        APP_UART_FLOW_CONTROL_DISABLED,
         false,
         UART_BAUDRATE_BAUDRATE_Baud115200
     };
@@ -728,11 +750,11 @@ void initializeIMU(){
     while (!initialized){	
       //SEGGER_RTT_printf(0,".");
     }
-		SEGGER_RTT_printf(0,"IMU Available!\r\n");
+		SEGGER_RTT_printf(0,"\nIMU Available!\r\n");
 		nrf_delay_ms(100);
 		if(setFeature(SENSOR_REPORTID_ROTATION_VECTOR, 100, 0))
 		{
-				SEGGER_RTT_printf(0,"Quats set");
+				SEGGER_RTT_printf(0,"\nQuats set\r\n");
 		}
 		nrf_delay_ms(100);
 }
@@ -842,38 +864,39 @@ int main(void)
 {
     uint32_t err_code;
     bool erase_bonds;
-
+		
     // Initialize.
     APP_TIMER_INIT(APP_TIMER_PRESCALER, APP_TIMER_OP_QUEUE_SIZE, false);
-    uart_init();
+    if(UART_EN == true)
+		{
+			uart_init();
+			SEGGER_RTT_printf(0,"\r\nUART Initialized!\r\n");
+		}
+		else
+		{
+			SEGGER_RTT_printf(0,"\n\rTWI sensor example\r\n");
+			twi_init();
+			SEGGER_RTT_printf(0,"\n\rTWI Initialized\r\n");
+			initializeIMU();
+			SEGGER_RTT_printf(0,"\n\rIMU Initialized\r\n");
+		}
     
-    buttons_leds_init(&erase_bonds);
+    //buttons_leds_init(&erase_bonds);
     ble_stack_init();
     gap_params_init();
     services_init();
     advertising_init();
     conn_params_init();
-	
-		//SEGGER_RTT_printf(0,"\n\rTWI sensor example\r\n");
-    twi_init();
-		//SEGGER_RTT_printf(0,"\n\rTWI initiated\r\n");
-		initializeIMU();
-		//SEGGER_RTT_printf(0,"\n\rIMU initialted\r\n");
-    
-    
-
-    //SEGGER_RTT_printf(0,"\r\nUART Start!\r\n");
     err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
     APP_ERROR_CHECK(err_code);
     
-    // Enter main loop.
+		// Enter main loop.
     for (;;)
     {
 				get_QUAT();
 				sprintf((char*)&str[0], "%3.2f,%3.2f,%3.2f,%3.2f", quatReal, quatI, quatJ, quatK);
-				sendData(str, sizeof(str));
-				nrf_delay_ms(100);
-        //power_manage();
+				nrf_delay_ms(10);
+        power_manage();
     }
 }
 
