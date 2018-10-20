@@ -449,7 +449,8 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
             APP_ERROR_CHECK(err_code);
             break;
 				case BLE_EVT_TX_COMPLETE:
-						sendData(str, sizeof(str));
+						//sendData(str, sizeof(str));
+						SEGGER_RTT_printf(0,"\n\rData sent\r\n");
 						break;
         default:
             // No implementation needed.
@@ -867,18 +868,19 @@ int main(void)
 		
     // Initialize.
     APP_TIMER_INIT(APP_TIMER_PRESCALER, APP_TIMER_OP_QUEUE_SIZE, false);
+	
     if(UART_EN == true)
 		{
-			uart_init();
-			SEGGER_RTT_printf(0,"\r\nUART Initialized!\r\n");
+				uart_init();
+				SEGGER_RTT_printf(0,"\r\nUART Initialized!\r\n");
 		}
 		else
 		{
-			SEGGER_RTT_printf(0,"\n\rTWI sensor example\r\n");
-			twi_init();
-			SEGGER_RTT_printf(0,"\n\rTWI Initialized\r\n");
-			initializeIMU();
-			SEGGER_RTT_printf(0,"\n\rIMU Initialized\r\n");
+				SEGGER_RTT_printf(0,"\n\rTWI sensor example\r\n");
+				twi_init();
+				SEGGER_RTT_printf(0,"\n\rTWI Initialized\r\n");
+				initializeIMU();
+				SEGGER_RTT_printf(0,"\n\rIMU Initialized\r\n");
 		}
     
     //buttons_leds_init(&erase_bonds);
@@ -895,6 +897,7 @@ int main(void)
     {
 				get_QUAT();
 				sprintf((char*)&str[0], "%3.2f,%3.2f,%3.2f,%3.2f", quatReal, quatI, quatJ, quatK);
+				if(TX_Complete)sendData(str, sizeof(str));
 				nrf_delay_ms(10);
         power_manage();
     }
