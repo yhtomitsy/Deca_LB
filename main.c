@@ -278,7 +278,7 @@ static void nus_data_handler(ble_nus_t * p_nus, uint8_t * p_data, uint16_t lengt
 static void sendData(uint8_t array[], uint8_t arraySize){
 		uint32_t       err_code;
 		uint8_t buff1[20] = {0};
-		uint8_t buff2[4] = {0};
+		uint8_t buff2[4] = {0, 0, 0, 0};
 		
 		if(str[20] == 0 && str[21] == 0 && str[22] == 0 && str[23] == 0) err_code = ble_nus_string_send(&m_nus, array, BLE_NUS_MAX_DATA_LEN);
 		else
@@ -289,17 +289,22 @@ static void sendData(uint8_t array[], uint8_t arraySize){
 				for(uint8_t i = 0; i < 4; i++)
 				{
 						buff2[i] = array[20 + i];
+						if((char)array[20 + i] == ';')
+						{
+								err_code = ble_nus_string_send(&m_nus, buff2, i + 1);
+								break;
+						}
 				}
-				err_code = ble_nus_string_send(&m_nus, buff2, 4);
+				
 		}
-		//SEGGER_RTT_printf(0,"DS\n");
+		////SEGGER_RTT_printf(0,"DS\n");
 		//err_code != BLE_ERROR_NO_TX_BUFFERS
 		if (err_code != NRF_SUCCESS &&
         err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
         err_code != NRF_ERROR_INVALID_STATE
         )
     {
-				//SEGGER_RTT_printf(0, "Error: %d", err_code);
+				////SEGGER_RTT_printf(0, "Error: %d", err_code);
         //APP_ERROR_CHECK(err_code);
     }
 }
@@ -432,7 +437,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
     {
         case BLE_GAP_EVT_CONNECTED:
 						
-						//SEGGER_RTT_printf(0,"\r\nConnected!\r\n");
+						////SEGGER_RTT_printf(0,"\r\nConnected!\r\n");
             err_code = bsp_indication_set(BSP_INDICATE_CONNECTED);
             APP_ERROR_CHECK(err_code);
             m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
@@ -440,17 +445,17 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
 						if(UART_EN)
 						{
 								printf("*");
-								SEGGER_RTT_printf(0,"\r\nUART requested!\r\n");
+								//SEGGER_RTT_printf(0,"\r\nUART requested!\r\n");
 						}
 						else
 						{	
-								SEGGER_RTT_printf(0,"\r\nInitial data submission!\r\n");
+								//SEGGER_RTT_printf(0,"\r\nInitial data submission!\r\n");
 								//sendData(str, sizeof(str));
 						}
             break;
             
         case BLE_GAP_EVT_DISCONNECTED:
-						SEGGER_RTT_printf(0,"\r\nDisconnected!\r\n");
+						//SEGGER_RTT_printf(0,"\r\nDisconnected!\r\n");
 						TX_Complete = false;
             err_code = bsp_indication_set(BSP_INDICATE_IDLE);
             APP_ERROR_CHECK(err_code);
@@ -471,7 +476,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
 				case BLE_EVT_TX_COMPLETE:
 						//sendData(str, sizeof(str));
 						//TX_Complete = true;
-						SEGGER_RTT_printf(0,"\n\rData sent\r\n");
+						////SEGGER_RTT_printf(0,"\n\rData sent\r\n");
 						break;
         default:
             // No implementation needed.
@@ -590,7 +595,7 @@ void uart_event_handle(app_uart_evt_t * p_event)
                 if(TX_Complete)
 								{
 										err_code = ble_nus_string_send(&m_nus, data_array, index);
-										//SEGGER_RTT_printf(0,"Data sent!\r\n");
+										////SEGGER_RTT_printf(0,"Data sent!\r\n");
 										TX_Complete =  false;
 								}
                 if (err_code != NRF_ERROR_INVALID_STATE)
@@ -731,7 +736,23 @@ void twi_handler(nrf_drv_twi_evt_t const * p_event, void * p_context)
 								APP_ERROR_CHECK(err_code);	
 						}
 						else{
+								if(!initialized)
+								{
+										initialized = true;  
+										return;
+								}
 								readSuccess = true;
+								/*//SEGGER_RTT_printf(0, "EVTTX\r\n");
+								if(sampleTimes == 0)
+								{
+										readSuccess = true;
+								}
+								else
+								{
+										err_code = nrf_drv_twi_tx(&m_twi_bno, BNO_ADDRESS, (uint8_t*)&cargo, sizeof(cargo));
+										sampleTimes++;
+										if(sampleTimes == 3)sampleTimes = 0;
+								}*/
 						}
             break;
         default:
@@ -747,8 +768,8 @@ void twi_init (void)
     ret_code_t err_code;
     
     const nrf_drv_twi_config_t twi_bno_config = {
-       .scl                = 4,//ARDUINO_SCL_PIN,
-       .sda                = 3, //ARDUINO_SDA_PIN,
+       .scl                = ARDUINO_SCL_PIN,
+       .sda                = ARDUINO_SDA_PIN,
        .frequency          = NRF_TWI_FREQ_400K,
        .interrupt_priority = APP_IRQ_PRIORITY_HIGH
     };
@@ -768,15 +789,15 @@ void initializeIMU(){
 		
 		// check if i2C communication is sucessful
 		err_code = nrf_drv_twi_tx(&m_twi_bno, BNO_ADDRESS, reg, sizeof(reg), false);  
-		nrf_delay_ms(10);		
+		nrf_delay_ms(100);		
     while (!initialized){	
-      //SEGGER_RTT_printf(0,".");
+      ////SEGGER_RTT_printf(0,".");
     }
-		SEGGER_RTT_printf(0,"\nIMU Available!\r\n");
+		//SEGGER_RTT_printf(0,"\nIMU Available!\r\n");
 		nrf_delay_ms(100);
 		if(setFeature(SENSOR_REPORTID_ROTATION_VECTOR, 1, 0))
 		{
-				SEGGER_RTT_printf(0,"\nQuats set\r\n");
+				//SEGGER_RTT_printf(0,"\nQuats set\r\n");
 		}
 		nrf_delay_ms(100);
 }
@@ -793,7 +814,7 @@ static void get_QUAT()
 				nrf_delay_ms(10);
 				//APP_ERROR_CHECK(err_code);
 				while(!readSuccess){
-						//SEGGER_RTT_printf(0, ".");
+						////SEGGER_RTT_printf(0, ".");
 				}
 		}
 
@@ -801,18 +822,18 @@ static void get_QUAT()
     if((readSuccess == 1) && (cargo[9] == quat_report) && (cargo[2] == 0x03) && (cargo[4] == 0xFB)){    //  && ((cargo[10]) == next_data_seqNum ) check for report and incrementing data seqNum
 				//next_data_seqNum = ++cargo[10];                                         // predict next data seqNum              
         stat_ = cargo[11] & 0x03;                                                 // bits 1:0 contain the status (0,1,2,3)  
-				//for(uint8_t i = 0; i < 8; i++)SEGGER_RTT_printf(0,"%d, ", cargo[13 + i]);
-        //SEGGER_RTT_printf(0,"\r\n");
+				//for(uint8_t i = 0; i < 8; i++)//SEGGER_RTT_printf(0,"%d, ", cargo[13 + i]);
+        ////SEGGER_RTT_printf(0,"\r\n");
 		
 				float qI = (((int16_t)cargo[14] << 8) | cargo[13] ); 
         float qJ = (((int16_t)cargo[16] << 8) | cargo[15] );
         float qK = (((int16_t)cargo[18] << 8) | cargo[17] );
         float qReal = (((int16_t)cargo[20] << 8) | cargo[19] ); 
 		
-				/*SEGGER_RTT_printf(0,"%d, ", qI);
-				SEGGER_RTT_printf(0,"%d, ", qJ);
-				SEGGER_RTT_printf(0,"%d, ", qK);
-				SEGGER_RTT_printf(0,"%d\r\n", qReal);*/
+				/*//SEGGER_RTT_printf(0,"%d, ", qI);
+				//SEGGER_RTT_printf(0,"%d, ", qJ);
+				//SEGGER_RTT_printf(0,"%d, ", qK);
+				//SEGGER_RTT_printf(0,"%d\r\n", qReal);*/
 		
         quatReal = qToFloat_(qReal, 14); //pow(2, 14 * -1);//QP(14); 
         quatI = qToFloat_(qI, 14); //pow(2, 14 * -1);//QP(14); 
@@ -890,32 +911,33 @@ int main(void)
     uint32_t err_code;
     bool erase_bonds;
 		
-    
-	// Initialize.
+		// Initialize.
     APP_TIMER_INIT(APP_TIMER_PRESCALER, APP_TIMER_OP_QUEUE_SIZE, false);
-	
-    if(UART_EN == true)
+		uart_init();
+    //buttons_leds_init(&erase_bonds);
+    ble_stack_init();
+    gap_params_init();
+    services_init();
+    advertising_init();
+    conn_params_init();	
+		
+    err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
+    APP_ERROR_CHECK(err_code);
+		
+		if(UART_EN == true)
 		{
 				uart_init();
-				SEGGER_RTT_printf(0,"\r\nUART Initialized!\r\n");
+				//SEGGER_RTT_printf(0,"\r\nUART Initialized!\r\n");
 		}
 		else
-		{
+		{		
+				nrf_delay_ms(1000);
 				SEGGER_RTT_printf(0,"\n\rTWI sensor example\r\n");
 				twi_init();
 				SEGGER_RTT_printf(0,"\n\rTWI Initialized\r\n");
 				initializeIMU();
 				SEGGER_RTT_printf(0,"\n\rIMU Initialized\r\n");
 		}
-    
-    //buttons_leds_init(&erase_bonds);
-    ble_stack_init();
-    gap_params_init();
-    services_init();
-    advertising_init();
-    conn_params_init();
-    err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
-    APP_ERROR_CHECK(err_code);
     
 		// Enter main loop.
     for (;;)
@@ -931,6 +953,7 @@ int main(void)
 				}
 				sampleTimes++;
 				if(sampleTimes == 3)sampleTimes = 0;
+				//nrf_delay_ms(100);
         power_manage();
     }
 }

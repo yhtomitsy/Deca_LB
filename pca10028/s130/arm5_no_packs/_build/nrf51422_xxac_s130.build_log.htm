@@ -38,15 +38,15 @@ compiling main.c...
   void requestProductID();                                    // request the product ID
 ..\..\..\main.c(280): warning:  #177-D: variable "buff1" was declared but never referenced
   		uint8_t buff1[20] = {0};
-..\..\..\main.c(717): warning:  #177-D: variable "s" was declared but never referenced
+..\..\..\main.c(722): warning:  #177-D: variable "s" was declared but never referenced
   		int s = 0;
-..\..\..\main.c(777): warning:  #550-D: variable "err_code" was set but never used
+..\..\..\main.c(787): warning:  #550-D: variable "err_code" was set but never used
   		ret_code_t err_code;
-..\..\..\main.c(798): warning:  #550-D: variable "err_code" was set but never used
+..\..\..\main.c(808): warning:  #550-D: variable "err_code" was set but never used
   		ret_code_t err_code;	
-..\..\..\main.c(799): warning:  #177-D: variable "reg" was declared but never referenced
+..\..\..\main.c(809): warning:  #177-D: variable "reg" was declared but never referenced
   		uint8_t reg[4] = {0, 0};
-..\..\..\main.c(902): warning:  #177-D: variable "erase_bonds" was declared but never referenced
+..\..\..\main.c(912): warning:  #177-D: variable "erase_bonds" was declared but never referenced
       bool erase_bonds;
 ..\..\..\main.c(169): warning:  #177-D: variable "q0" was declared but never referenced
   static float q0,q1,q2,q3;                                		// quaternions q0 = qw 1 = i; 2 = j; 3 = k;
@@ -74,11 +74,11 @@ compiling main.c...
   static void set_feature_cmd_QUAT(); 												// configure quaternion output
 ..\..\..\main.c(191): warning:  #177-D: function "sendPacket_IMU" was declared but never referenced
   static void sendPacket_IMU(uint8_t, uint8_t);               // send data to IMU
-..\..\..\main.c(680): warning:  #177-D: function "buttons_leds_init" was declared but never referenced
+..\..\..\main.c(685): warning:  #177-D: function "buttons_leds_init" was declared but never referenced
   static void buttons_leds_init(bool * p_erase_bonds)
 ..\..\..\main.c: 24 warnings, 0 errors
 linking...
-Program Size: Code=24404 RO-data=856 RW-data=356 ZI-data=6892  
+Program Size: Code=25420 RO-data=936 RW-data=356 ZI-data=7404  
 FromELF: creating hex file...
 ".\_build\nrf51422_xxac_s130.axf" - 0 Error(s), 24 Warning(s).
 
@@ -110,7 +110,7 @@ Package Vendor: NordicSemiconductor
       Include file:  Device\Include\system_nrf51.h
       Source file:   Device\Source\system_nrf51.c
       Source file:   Device\Source\arm\arm_startup_nrf51.s
-Build Time Elapsed:  00:00:09
+Build Time Elapsed:  00:00:01
 </pre>
 </body>
 </html>
