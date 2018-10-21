@@ -60,8 +60,8 @@
 #define APP_TIMER_PRESCALER             0                                           /**< Value of the RTC1 PRESCALER register. */
 #define APP_TIMER_OP_QUEUE_SIZE         4                                           /**< Size of timer operation queues. */
 
-#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(20, UNIT_1_25_MS)             /**< Minimum acceptable connection interval (20 ms), Connection interval uses 1.25 ms units. */
-#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(75, UNIT_1_25_MS)             /**< Maximum acceptable connection interval (75 ms), Connection interval uses 1.25 ms units. */
+#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(7.5, UNIT_1_25_MS)             /**< Minimum acceptable connection interval (20 ms), Connection interval uses 1.25 ms units. */
+#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(7.5, UNIT_1_25_MS)             /**< Maximum acceptable connection interval (75 ms), Connection interval uses 1.25 ms units. */
 #define SLAVE_LATENCY                   0                                           /**< Slave latency. */
 #define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)             /**< Connection supervisory timeout (4 seconds), Supervision Timeout uses 10 ms units. */
 #define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(5000, APP_TIMER_PRESCALER)  /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
@@ -183,7 +183,7 @@ static float quatReal_Prev = 0;
 static bool reset = false;																	
 static bool requestID = false;
 uint8_t i2C_event = 0;
-uint8_t str[20]; 																						// Holds the string from the IMU
+uint8_t str[24]; 																						// Holds the string from the IMU
 
 // function prototypes
 static void set_feature_cmd_QUAT(); 												// configure quaternion output
@@ -196,6 +196,7 @@ bool setFeature(uint8_t, uint16_t, uint32_t);								// set a feature on the IMU
 
 bool TX_Complete = false;
 const bool UART_EN = false;
+static uint8_t sampleTimes = 0;
 
 /**@brief Function for assert macro callback.
  *
@@ -276,9 +277,21 @@ static void nus_data_handler(ble_nus_t * p_nus, uint8_t * p_data, uint16_t lengt
  */
 static void sendData(uint8_t array[], uint8_t arraySize){
 		uint32_t       err_code;
+		uint8_t buff1[20] = {0};
+		uint8_t buff2[4] = {0};
 		
-		//m_nus.is_notification_enabled = true;
-		err_code = ble_nus_string_send(&m_nus, array, arraySize);
+		if(str[20] == 0 && str[21] == 0 && str[22] == 0 && str[23] == 0) err_code = ble_nus_string_send(&m_nus, array, BLE_NUS_MAX_DATA_LEN);
+		else
+		{
+				
+				err_code = ble_nus_string_send(&m_nus, array, BLE_NUS_MAX_DATA_LEN);
+				nrf_delay_ms(5);
+				for(uint8_t i = 0; i < 4; i++)
+				{
+						buff2[i] = array[20 + i];
+				}
+				err_code = ble_nus_string_send(&m_nus, buff2, 4);
+		}
 		//SEGGER_RTT_printf(0,"DS\n");
 		//err_code != BLE_ERROR_NO_TX_BUFFERS
 		if (err_code != NRF_SUCCESS &&
@@ -286,7 +299,7 @@ static void sendData(uint8_t array[], uint8_t arraySize){
         err_code != NRF_ERROR_INVALID_STATE
         )
     {
-				SEGGER_RTT_printf(0, "Error: %d", err_code);
+				//SEGGER_RTT_printf(0, "Error: %d", err_code);
         //APP_ERROR_CHECK(err_code);
     }
 }
@@ -419,7 +432,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
     {
         case BLE_GAP_EVT_CONNECTED:
 						
-						SEGGER_RTT_printf(0,"\r\nConnected!\r\n");
+						//SEGGER_RTT_printf(0,"\r\nConnected!\r\n");
             err_code = bsp_indication_set(BSP_INDICATE_CONNECTED);
             APP_ERROR_CHECK(err_code);
             m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
@@ -432,12 +445,13 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
 						else
 						{	
 								SEGGER_RTT_printf(0,"\r\nInitial data submission!\r\n");
-								sendData(str, sizeof(str));
+								//sendData(str, sizeof(str));
 						}
             break;
             
         case BLE_GAP_EVT_DISCONNECTED:
 						SEGGER_RTT_printf(0,"\r\nDisconnected!\r\n");
+						TX_Complete = false;
             err_code = bsp_indication_set(BSP_INDICATE_IDLE);
             APP_ERROR_CHECK(err_code);
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
@@ -456,6 +470,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
             break;
 				case BLE_EVT_TX_COMPLETE:
 						//sendData(str, sizeof(str));
+						//TX_Complete = true;
 						SEGGER_RTT_printf(0,"\n\rData sent\r\n");
 						break;
         default:
@@ -575,7 +590,7 @@ void uart_event_handle(app_uart_evt_t * p_event)
                 if(TX_Complete)
 								{
 										err_code = ble_nus_string_send(&m_nus, data_array, index);
-										SEGGER_RTT_printf(0,"Data sent!\r\n");
+										//SEGGER_RTT_printf(0,"Data sent!\r\n");
 										TX_Complete =  false;
 								}
                 if (err_code != NRF_ERROR_INVALID_STATE)
@@ -773,10 +788,13 @@ static void get_QUAT()
 		uint8_t reg[4] = {0, 0};
 		
 		err_code = nrf_drv_twi_rx(&m_twi_bno, BNO_ADDRESS, (uint8_t*)&cargo, sizeof(cargo));
-		nrf_delay_ms(10);
-		//APP_ERROR_CHECK(err_code);
-		while(!readSuccess){
-				// do nothing
+		if(sampleTimes == 0)
+		{
+				nrf_delay_ms(10);
+				//APP_ERROR_CHECK(err_code);
+				while(!readSuccess){
+						//SEGGER_RTT_printf(0, ".");
+				}
 		}
 
     //Check to see if this packet is a sensor reporting its data to us
@@ -872,7 +890,8 @@ int main(void)
     uint32_t err_code;
     bool erase_bonds;
 		
-    // Initialize.
+    
+	// Initialize.
     APP_TIMER_INIT(APP_TIMER_PRESCALER, APP_TIMER_OP_QUEUE_SIZE, false);
 	
     if(UART_EN == true)
@@ -902,16 +921,16 @@ int main(void)
     for (;;)
     {
 				get_QUAT();
-				if(quatReal != quatReal_Prev && quatI != quatI_Prev && quatJ != quatJ_Prev && quatK != quatK_Prev)
+				if(sampleTimes == 0)
 				{
-						sprintf((char*)&str[0], "%3.2f,%3.2f,%3.2f,%3.2f", quatReal, quatI, quatJ, quatK);
+						memset(str, 0, sizeof(str));
+						sprintf((char*)&str[0], "%3.2f,%3.2f,%3.2f,%3.2f;", quatReal, quatI, quatJ, quatK);
 						if(TX_Complete)sendData(str, sizeof(str));
-						quatReal_Prev = quatReal;
-						quatI_Prev = quatI;
-						quatJ_Prev = quatJ;
-						quatK_Prev = quatK;
+						sampleTimes++;
+						//SEGGER_RTT_WriteString(0,"Sent NUS \r\n");
 				}
-				//nrf_delay_ms(1);
+				sampleTimes++;
+				if(sampleTimes == 3)sampleTimes = 0;
         power_manage();
     }
 }
