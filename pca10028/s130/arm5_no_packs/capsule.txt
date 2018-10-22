@@ -1,0 +1,18 @@
+//readSuccess = false;      
+		//ret_code_t err_code;	
+		//err_code = nrf_drv_twi_rx(&m_twi_bno, BNO_ADDRESS, (uint8_t*)&cargo, sizeof(cargo));
+		//nrf_delay_ms(10);
+		//APP_ERROR_CHECK(err_code);
+		/*while(!readSuccess)
+		{
+			;
+		}*/
+		/*for(uint8_t i = 0; i < 23; i++)SEGGER_RTT_printf(0,"%d, ", cargo[i]);
+    SEGGER_RTT_printf(0,"\r\n");*/
+	
+	
+	
+				/*//SEGGER_RTT_printf(0,"%d, ", qI);
+				//SEGGER_RTT_printf(0,"%d, ", qJ);
+				//SEGGER_RTT_printf(0,"%d, ", qK);
+				//SEGGER_RTT_printf(0,"%d\r\n", qReal);*/

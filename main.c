@@ -151,6 +151,12 @@ uint8_t sequenceNumber[6] = {0, 0, 0, 0, 0, 0}; //There are 6 com channels. Each
 uint8_t commandSequenceNumber = 0; //Commands have a seqNum as well. These are inside command packet, the header uses its own seqNum per channel
 uint32_t metaData[MAX_METADATA_SIZE]; //There is more than 10 words in a metadata record but
 
+int16_t rotationVector_Q1 = 14;
+int16_t accelerometer_Q1 = 8;
+int16_t linear_accelerometer_Q1 = 8;
+int16_t gyro_Q1 = 9;
+int16_t magnetometer_Q1 = 4;
+
 #define BNO_ADDRESS               	0x4B            // Device address when SA0 Pin 17 = GND; 0x4B SA0 Pin 17 = VDD
 #define QP(n)                       (1.0f / (1 << n))                   // 1 << n ==  2^-n
 #define radtodeg                    (180.0f / (22/7))
@@ -165,38 +171,42 @@ const uint8_t quat_report = 0x05;          									// defines kind of rotation 
 const int reporting_frequency    = 400;           					// reporting frequency in Hz  // note that serial output strongly reduces data rate
 const uint8_t B0_rate = 1000000 / reporting_frequency;      // calculate LSB (byte 0)
 const uint8_t B1_rate = B0_rate >> 8;                       // calculate byte 1
-static uint8_t readSuccess = 0;                             // confirms quaternion has been read successfully
+static bool readSuccess = true;                             // confirms quaternion has been read successfully
 static float q0,q1,q2,q3;                                		// quaternions q0 = qw 1 = i; 2 = j; 3 = k;
 static float h_est;                                      		// heading accurracy estimation
 static uint8_t stat_;                                    		// Status (0-3)
 static uint8_t cargo[23] = {0}; 														// holds in coming data
 
+// IMU data
 static float quatI = 0;
 static float quatJ = 0;
 static float quatK = 0;
 static float quatReal = 0;
-static float quatI_Prev = 0;
-static float quatJ_Prev = 0;
-static float quatK_Prev = 0;
-static float quatReal_Prev = 0;
+static float accelX = 0;
+static float accelY = 0;
+static float accelZ = 0;
+static float activityClassifier = 0;
 
-static bool reset = false;																	
-static bool requestID = false;
+bool reset = false;																	
+bool requestID = false;
+uint8_t readDataTimes = 0;
 uint8_t i2C_event = 0;
-uint8_t str[24]; 																						// Holds the string from the IMU
+uint8_t str[50]; 																						// Holds the string from the IMU
+bool TX_Complete = false;
+const bool UART_EN = false;
+static uint8_t sampleTimes = 0;
 
 // function prototypes
 static void set_feature_cmd_QUAT(); 												// configure quaternion output
 float qToFloat_(int16_t, uint8_t);    											// convert q point data into float
 static void sendPacket_IMU(uint8_t, uint8_t);               // send data to IMU
 void resetIMU();                                            // reset the IMU
-void requestProductID();                                    // request the product ID
+bool requestProductID();                                    // request the product ID
 bool sendDataPacket(uint8_t, uint8_t);											// send data packet to IMU
 bool setFeature(uint8_t, uint16_t, uint32_t);								// set a feature on the IMU
+void parseData();																						// get data from incoming packets
 
-bool TX_Complete = false;
-const bool UART_EN = false;
-static uint8_t sampleTimes = 0;
+
 
 /**@brief Function for assert macro callback.
  *
@@ -513,24 +523,27 @@ static void ble_stack_init(void)
     uint32_t err_code;
     
     nrf_clock_lf_cfg_t clock_lf_cfg = NRF_CLOCK_LFCLKSRC;
-    
+    SEGGER_RTT_printf(0,"\n\rConfig clock: %d\r\n", err_code);
     // Initialize SoftDevice.
     SOFTDEVICE_HANDLER_INIT(&clock_lf_cfg, NULL);
-    
+    SEGGER_RTT_printf(0,"\n\rInit softdevice handler: %d\r\n", err_code);
     ble_enable_params_t ble_enable_params;
     err_code = softdevice_enable_get_default_config(CENTRAL_LINK_COUNT,
                                                     PERIPHERAL_LINK_COUNT,
-                                                    &ble_enable_params);
+		                                                &ble_enable_params);
+		SEGGER_RTT_printf(0,"\n\rGet config: %d\r\n", err_code);
     APP_ERROR_CHECK(err_code);
         
     //Check the ram settings against the used number of links
     CHECK_RAM_START_ADDR(CENTRAL_LINK_COUNT,PERIPHERAL_LINK_COUNT);
     // Enable BLE stack.
     err_code = softdevice_enable(&ble_enable_params);
+		SEGGER_RTT_printf(0,"\n\rSoftDevice enable: %d\r\n", err_code);
     APP_ERROR_CHECK(err_code);
     
     // Subscribe for BLE events.
     err_code = softdevice_ble_evt_handler_set(ble_evt_dispatch);
+		SEGGER_RTT_printf(0,"\n\rSet event handler: %d\r\n", err_code);
     APP_ERROR_CHECK(err_code);
 }
 
@@ -725,6 +738,7 @@ void twi_handler(nrf_drv_twi_evt_t const * p_event, void * p_context)
         case NRF_DRV_TWI_EVT_DONE:				
 						if((p_event->xfer_desc.type == NRF_DRV_TWI_XFER_TX)) // receive event
 						{ 
+								SEGGER_RTT_printf(0, "EVTTX\r\n");
 								if(!initialized)
 								{
 										initialized = true;  
@@ -741,18 +755,22 @@ void twi_handler(nrf_drv_twi_evt_t const * p_event, void * p_context)
 										initialized = true;  
 										return;
 								}
-								readSuccess = true;
-								/*//SEGGER_RTT_printf(0, "EVTTX\r\n");
-								if(sampleTimes == 0)
+								else if(reset)
 								{
-										readSuccess = true;
+										readDataTimes++;
+										err_code = nrf_drv_twi_rx(&m_twi_bno, BNO_ADDRESS, (uint8_t*)&cargo, sizeof(cargo));
+										if(readDataTimes == 6)
+										{
+												reset = false;
+												readDataTimes = 0;
+										}
 								}
 								else
 								{
-										err_code = nrf_drv_twi_tx(&m_twi_bno, BNO_ADDRESS, (uint8_t*)&cargo, sizeof(cargo));
-										sampleTimes++;
-										if(sampleTimes == 3)sampleTimes = 0;
-								}*/
+										//SEGGER_RTT_printf(0, "EVTRX\r\n");
+										parseData();
+										readSuccess = true;
+								}
 						}
             break;
         default:
@@ -783,69 +801,88 @@ void twi_init (void)
 /**
  * @brief BNO IMU initialization.
  */
-void initializeIMU(){
+void initializeIMU()
+{
 		ret_code_t err_code;
 		uint8_t reg[2] = {0, 0};
 		
 		// check if i2C communication is sucessful
+		SEGGER_RTT_printf(0,"\nCheck IMU availability!\r\n");
 		err_code = nrf_drv_twi_tx(&m_twi_bno, BNO_ADDRESS, reg, sizeof(reg), false);  
 		nrf_delay_ms(100);		
     while (!initialized){	
       ////SEGGER_RTT_printf(0,".");
     }
-		//SEGGER_RTT_printf(0,"\nIMU Available!\r\n");
-		nrf_delay_ms(100);
+		SEGGER_RTT_printf(0,"\nIMU Available!\r\n");
+		SEGGER_RTT_printf(0,"\nReset IMU!\r\n");
+		resetIMU();
+		while(reset)
+		{
+			;
+		}	
+		nrf_delay_ms(1000);
+		SEGGER_RTT_printf(0,"\nIMU Reset successful!\r\n");
+		SEGGER_RTT_printf(0,"\nChecking product ID!\r\n");
+		while(!requestProductID())
+		{
+				nrf_delay_ms(10);
+		}
+		SEGGER_RTT_printf(0,"\nIMU Product ID received!\r\n");
+		// configure quaternion output
 		if(setFeature(SENSOR_REPORTID_ROTATION_VECTOR, 1, 0))
 		{
-				//SEGGER_RTT_printf(0,"\nQuats set\r\n");
+				SEGGER_RTT_printf(0,"\nQuats set\r\n");
 		}
+		nrf_delay_ms(100);
+		// configure real accelerometer output
+		if(setFeature(SENSOR_REPORTID_LINEAR_ACCELERATION, 1, 0))
+		{
+				SEGGER_RTT_printf(0,"\nReal acceleration set\r\n");
+		}
+		
 		nrf_delay_ms(100);
 }
 
-static void get_QUAT()
+void parseData()
 {  
-    readSuccess = 0;       
-		ret_code_t err_code;	
-		uint8_t reg[4] = {0, 0};
-		
-		err_code = nrf_drv_twi_rx(&m_twi_bno, BNO_ADDRESS, (uint8_t*)&cargo, sizeof(cargo));
-		if(sampleTimes == 0)
-		{
-				nrf_delay_ms(10);
-				//APP_ERROR_CHECK(err_code);
-				while(!readSuccess){
-						////SEGGER_RTT_printf(0, ".");
-				}
-		}
-
-    //Check to see if this packet is a sensor reporting its data to us
-    if((readSuccess == 1) && (cargo[9] == quat_report) && (cargo[2] == 0x03) && (cargo[4] == 0xFB)){    //  && ((cargo[10]) == next_data_seqNum ) check for report and incrementing data seqNum
+    //Check to see if this packet is a sensor reporting quaternion data to us
+    if((cargo[9] == SENSOR_REPORTID_ROTATION_VECTOR) && (cargo[2] == 0x03) && (cargo[4] == 0xFB)){    //  && ((cargo[10]) == next_data_seqNum ) check for report and incrementing data seqNum
+				//SEGGER_RTT_printf(0, "Valid data quat\r\n");
 				//next_data_seqNum = ++cargo[10];                                         // predict next data seqNum              
-        stat_ = cargo[11] & 0x03;                                                 // bits 1:0 contain the status (0,1,2,3)  
-				//for(uint8_t i = 0; i < 8; i++)//SEGGER_RTT_printf(0,"%d, ", cargo[13 + i]);
-        ////SEGGER_RTT_printf(0,"\r\n");
+        stat_ = cargo[11] & 0x03;                                                 // bits 1:0 contain the status (0,1,2,3) 
 		
 				float qI = (((int16_t)cargo[14] << 8) | cargo[13] ); 
         float qJ = (((int16_t)cargo[16] << 8) | cargo[15] );
         float qK = (((int16_t)cargo[18] << 8) | cargo[17] );
         float qReal = (((int16_t)cargo[20] << 8) | cargo[19] ); 
 		
-				/*//SEGGER_RTT_printf(0,"%d, ", qI);
-				//SEGGER_RTT_printf(0,"%d, ", qJ);
-				//SEGGER_RTT_printf(0,"%d, ", qK);
-				//SEGGER_RTT_printf(0,"%d\r\n", qReal);*/
-		
-        quatReal = qToFloat_(qReal, 14); //pow(2, 14 * -1);//QP(14); 
-        quatI = qToFloat_(qI, 14); //pow(2, 14 * -1);//QP(14); 
-        quatJ = qToFloat_(qJ, 14); //pow(2, 14 * -1);//QP(14); 
-        quatK = qToFloat_(qK, 14); //pow(2, 14 * -1);//QP(14);                  // apply Q point (quats are already unity vector)
+        quatReal = qToFloat_(qReal, rotationVector_Q1); //pow(2, 14 * -1);//QP(14); 
+        quatI = qToFloat_(qI, rotationVector_Q1);       //pow(2, 14 * -1);//QP(14); 
+        quatJ = qToFloat_(qJ, rotationVector_Q1);       //pow(2, 14 * -1);//QP(14); 
+        quatK = qToFloat_(qK, rotationVector_Q1);       //pow(2, 14 * -1);//QP(14);                  // apply Q point (quats are already unity vector)
 
         //if (quat_report == 0x05){  // heading accurracy only in some reports available
-        h_est = (((int16_t)cargo[22] << 8) | cargo[21] );                        // heading accurracy estimation  
-        h_est *= QP(12);                                                         // apply Q point 
-        h_est *= radtodeg;                                                       // convert to degrees                
+        //h_est = (((int16_t)cargo[22] << 8) | cargo[21] );                        // heading accurracy estimation  
+        //h_est *= QP(12);                                                         // apply Q point 
+        //h_est *= radtodeg;                                                       // convert to degrees                
         //}
     }
+		if((cargo[9] == SENSOR_REPORTID_LINEAR_ACCELERATION) && (cargo[2] == 0x03) && (cargo[4] == 0xFB)){    //  && ((cargo[10]) == next_data_seqNum ) check for report and incrementing data seqNum
+				//SEGGER_RTT_printf(0, "Valid data linear\r\n");
+				//next_data_seqNum = ++cargo[10];                                         // predict next data seqNum              
+        stat_ = cargo[11] & 0x03;                                                 // bits 1:0 contain the status (0,1,2,3) 
+		
+				float x = (((int16_t)cargo[14] << 8) | cargo[13] ); 
+        float y = (((int16_t)cargo[16] << 8) | cargo[15] );
+        float z = (((int16_t)cargo[18] << 8) | cargo[17] );
+		
+        accelX = qToFloat_(x, linear_accelerometer_Q1); //pow(2, 14 * -1);//QP(14); 
+        accelY = qToFloat_(y, linear_accelerometer_Q1); //pow(2, 14 * -1);//QP(14); 
+        accelZ = qToFloat_(z, linear_accelerometer_Q1); //pow(2, 14 * -1);//QP(14); 
+				// apply Q point (quats are already unity vector
+    }
+		memset(str, 0, sizeof(str));
+		sprintf((char*)&str[0], "%3.2f,%3.2f,%3.2f,%3.2f,%3.2f,%3.2f,%3.2f;", quatReal, quatI, quatJ, quatK, accelX, accelY, accelZ);
 }
 
 //Given a register value and a Q point, convert to float
@@ -885,6 +922,34 @@ bool setFeature(uint8_t reportID, uint16_t timeBetweenReports, uint32_t specific
 		return sendDataPacket(CHANNEL_CONTROL, 17);
 }
 
+void resetIMU()
+{
+		reset = true;
+		shtpData[4] = 1; //Reset
+
+		//Attempt to start communication with sensor
+		sendDataPacket(CHANNEL_EXECUTABLE, 1); //Transmit packet on channel 1, 1 byte
+		
+		SEGGER_RTT_printf(0, "Reset _in_function: %d\r\n", reset);
+}
+
+bool requestProductID()
+{
+		requestID = true;
+		ret_code_t err_code;
+		//Check communication with device
+		shtpData[4] = SHTP_REPORT_PRODUCT_ID_REQUEST; //Request the product ID and reset info
+		shtpData[5] = 0; //Reserved
+
+		//Transmit packet on channel 2, 2 bytes
+		sendDataPacket(CHANNEL_CONTROL, 2);
+		if(cargo[9] != SHTP_REPORT_PRODUCT_ID_RESPONSE)
+		{
+				return true;
+		}
+		return false;
+		
+}
 bool sendDataPacket(uint8_t channelNumber, uint8_t dataLength)
 {
     uint8_t packetLength = dataLength + 4; //Add four bytes for the header
@@ -897,7 +962,7 @@ bool sendDataPacket(uint8_t channelNumber, uint8_t dataLength)
 		shtpData[2] = channelNumber; //Feature flags
 		shtpData[3] = sequenceNumber[channelNumber]++; //Change sensitivity (LSB)
     
-		err_code = nrf_drv_twi_tx(&m_twi_bno, BNO_ADDRESS, shtpData, sizeof(shtpData), false);  
+		err_code = nrf_drv_twi_tx(&m_twi_bno, BNO_ADDRESS, shtpData, packetLength, false);  
 		nrf_delay_ms(10);
 	
     if (err_code != 0)
@@ -906,16 +971,142 @@ bool sendDataPacket(uint8_t channelNumber, uint8_t dataLength)
     }
     return true;
 }
+
+//Unit responds with packet that contains the following:
+//shtpHeader[0:3]: First, a 4 byte header
+//shtpData[0:4]: Then a 5 byte timestamp of microsecond clicks since reading was taken
+//shtpData[5 + 0]: Then a feature report ID (0x01 for Accel, 0x05 for Rotation Vector)
+//shtpData[5 + 1]: Sequence number (See 6.5.18.2)
+//shtpData[5 + 2]: Status
+//shtpData[3]: Delay
+//shtpData[4:5]: i/accel x/gyro x/etc
+//shtpData[6:7]: j/accel y/gyro y/etc
+//shtpData[8:9]: k/accel z/gyro z/etc
+//shtpData[10:11]: real/gyro temp/etc
+//shtpData[12:13]: Accuracy estimate
+void parseInputReport(void)
+{
+  //Calculate the number of data bytes in this packet
+  int16_t dataLength = ((uint16_t)shtpHeader[1] << 8 | shtpHeader[0]);
+  dataLength &= ~(1 << 15); //Clear the MSbit. This bit indicates if this package is a continuation of the last.
+  //Ignore it for now. TODO catch this as an error and exit
+
+  dataLength -= 4; //Remove the header bytes from the data count
+
+  uint8_t status = shtpData[5 + 2] & 0x03; //Get status bits
+  uint16_t data1 = (uint16_t)shtpData[5 + 5] << 8 | shtpData[5 + 4];
+  uint16_t data2 = (uint16_t)shtpData[5 + 7] << 8 | shtpData[5 + 6];
+  uint16_t data3 = (uint16_t)shtpData[5 + 9] << 8 | shtpData[5 + 8];
+  uint16_t data4 = 0;
+  uint16_t data5 = 0;
+
+  if (dataLength - 5 > 9)
+  {
+    data4 = (uint16_t)shtpData[5 + 11] << 8 | shtpData[5 + 10];
+  }
+  if (dataLength - 5 > 11)
+  {
+    data5 = (uint16_t)shtpData[5 + 13] << 8 | shtpData[5 + 12];
+  }
+
+  //Store these generic values to their proper global variable
+  if (shtpData[5] == SENSOR_REPORTID_ACCELEROMETER)
+  {
+    //accelAccuracy = status;
+    //rawAccelX = data1;
+    //rawAccelY = data2;
+    //rawAccelZ = data3;
+  }
+  /****************************************************************/
+  else if(shtpData[5] == SENSOR_REPORTID_LINEAR_ACCELERATION)
+  {
+		//accelRealAccuracy = status;
+		accelX = data1;
+		accelY = data2;
+		accelZ = data3;
+  }
+	/****************************************************************/
+  else if (shtpData[5] == SENSOR_REPORTID_LINEAR_ACCELERATION)
+  {
+    //accelLinAccuracy = status;
+    //rawLinAccelX = data1;
+    //rawLinAccelY = data2;
+    //rawLinAccelZ = data3;
+  }
+  else if (shtpData[5] == SENSOR_REPORTID_GYROSCOPE)
+  {
+    //gyroAccuracy = status;
+    //rawGyroX = data1;
+    //rawGyroY = data2;
+    //rawGyroZ = data3;
+  }
+  else if (shtpData[5] == SENSOR_REPORTID_MAGNETIC_FIELD)
+  {
+    //magAccuracy = status;
+    //rawMagX = data1;
+    //rawMagY = data2;
+    //rawMagZ = data3;
+  }
+  /*else if (shtpData[5] == SENSOR_REPORTID_ROTATION_VECTOR || shtpData[5] == SENSOR_REPORTID_GAME_ROTATION_VECTOR)
+  {
+    quatAccuracy = status;
+    rawQuatI = data1;
+    rawQuatJ = data2;
+    rawQuatK = data3;
+    rawQuatReal = data4;
+    rawQuatRadianAccuracy = data5; //Only available on rotation vector, not game rot vector
+  }
+  else if (shtpData[5] == SENSOR_REPORTID_STEP_COUNTER)
+  {
+    stepCount = data3; //Bytes 8/9
+  }
+  else if (shtpData[5] == SENSOR_REPORTID_STABILITY_CLASSIFIER)
+  {
+    stabilityClassifier = shtpData[5 + 4]; //Byte 4 only
+  }
+  else if (shtpData[5] == SENSOR_REPORTID_PERSONAL_ACTIVITY_CLASSIFIER)
+  {
+    activityClassifier = shtpData[5 + 5]; //Most likely state
+
+    //Load activity classification confidences into the array
+    for (uint8_t x = 0 ; x < 9 ; x++) //Hardcoded to max of 9. TODO - bring in array size
+      _activityConfidences[x] = shtpData[5 + 6 + x]; //5 bytes of timestamp, byte 6 is first confidence byte
+  }
+  else if (shtpData[5] == SHTP_REPORT_COMMAND_RESPONSE)
+  {
+	  Serial.println("!");
+	  //The BNO080 responds with this report to command requests. It's up to use to remember which command we issued.
+	  uint8_t command = shtpData[5 + 2]; //This is the Command byte of the response
+	  
+	  if(command == COMMAND_ME_CALIBRATE)
+	  {
+		Serial.println("ME Cal report found!");
+		calibrationStatus = shtpData[5 + 5]; //R0 - Status (0 = success, non-zero = fail)
+	  }
+  }
+  else
+  {
+    //This sensor report ID is unhandled.
+    //See reference manual to add additional feature reports as needed
+  }
+
+  //TODO additional feature reports may be strung together. Parse them all.*/
+}
+
 int main(void)
 {
     uint32_t err_code;
     bool erase_bonds;
 		
 		// Initialize.
+		
     APP_TIMER_INIT(APP_TIMER_PRESCALER, APP_TIMER_OP_QUEUE_SIZE, false);
 		uart_init();
+		SEGGER_RTT_printf(0,"\n\ruart init\r\n");
+		nrf_delay_ms(1000);
     //buttons_leds_init(&erase_bonds);
     ble_stack_init();
+		SEGGER_RTT_printf(0,"\n\rble stack\r\n");
     gap_params_init();
     services_init();
     advertising_init();
@@ -923,7 +1114,7 @@ int main(void)
 		
     err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
     APP_ERROR_CHECK(err_code);
-		
+		SEGGER_RTT_printf(0,"\n\rAdvertising\r\n");
 		if(UART_EN == true)
 		{
 				uart_init();
@@ -941,9 +1132,23 @@ int main(void)
     
 		// Enter main loop.
     for (;;)
-    {
-				get_QUAT();
-				if(sampleTimes == 0)
+    {	
+				if(readSuccess){
+						readSuccess = false;
+						SEGGER_RTT_printf(0,"%s \r\n", str);
+						//for(uint8_t i = 0; i < 23; i++)SEGGER_RTT_printf(0,"%d, ", (char)str[i]);
+						//SEGGER_RTT_printf(0,"\r\n");
+						err_code = nrf_drv_twi_rx(&m_twi_bno, BNO_ADDRESS, (uint8_t*)&cargo, sizeof(cargo));
+						APP_ERROR_CHECK(err_code);
+				}
+				
+				//get_QUAT();
+				//parseData();
+				//SEGGER_RTT_printf(0,"%d, ", quatI);
+				//SEGGER_RTT_printf(0,"%d, ", quatJ);
+				//SEGGER_RTT_printf(0,"%d, ", quatK);
+				//SEGGER_RTT_printf(0,"%d\r\n", quatReal);
+				/*if(sampleTimes == 0)
 				{
 						memset(str, 0, sizeof(str));
 						sprintf((char*)&str[0], "%3.2f,%3.2f,%3.2f,%3.2f;", quatReal, quatI, quatJ, quatK);
@@ -952,8 +1157,8 @@ int main(void)
 						//SEGGER_RTT_WriteString(0,"Sent NUS \r\n");
 				}
 				sampleTimes++;
-				if(sampleTimes == 3)sampleTimes = 0;
-				//nrf_delay_ms(100);
+				if(sampleTimes == 3)sampleTimes = 0;*/
+				//nrf_delay_ms(10);
         power_manage();
     }
 }
