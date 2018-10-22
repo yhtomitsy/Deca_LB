@@ -185,7 +185,7 @@ static float quatReal = 0;
 static float accelX = 0;
 static float accelY = 0;
 static float accelZ = 0;
-static float activityClassifier = 0;
+static uint8_t activityClassifier = 0;
 
 bool reset = false;																	
 bool requestID = false;
@@ -307,6 +307,7 @@ static void sendData(uint8_t array[], uint8_t arraySize){
 				}
 				
 		}
+		//for(uint8_t i = 0; i < arraySize)
 		////SEGGER_RTT_printf(0,"DS\n");
 		//err_code != BLE_ERROR_NO_TX_BUFFERS
 		if (err_code != NRF_SUCCESS &&
@@ -839,6 +840,13 @@ void initializeIMU()
 		{
 				SEGGER_RTT_printf(0,"\nReal acceleration set\r\n");
 		}
+		nrf_delay_ms(100);
+		
+		// configure real accelerometer output
+		if(setFeature(SENSOR_REPORTID_PERSONAL_ACTIVITY_CLASSIFIER, 50, 0x1F)) // 0x1F activates all classifiers
+		{
+				SEGGER_RTT_printf(0,"\nActivity calssifier set\r\n");
+		}
 		
 		nrf_delay_ms(100);
 }
@@ -881,8 +889,12 @@ void parseData()
         accelZ = qToFloat_(z, linear_accelerometer_Q1); //pow(2, 14 * -1);//QP(14); 
 				// apply Q point (quats are already unity vector
     }
+		if((cargo[9] == SENSOR_REPORTID_LINEAR_ACCELERATION) && (cargo[2] == 0x03) && (cargo[4] == 0xFB)){    //  && ((cargo[10]) == next_data_seqNum ) check for report and incrementing data seqNum
+				activityClassifier = (int16_t)cargo[14];
+				if(activityClassifier == 255)activityClassifier = 0;
+    }
 		memset(str, 0, sizeof(str));
-		sprintf((char*)&str[0], "%3.2f,%3.2f,%3.2f,%3.2f,%3.2f,%3.2f,%3.2f;", quatReal, quatI, quatJ, quatK, accelX, accelY, accelZ);
+		sprintf((char*)&str[0], "%3.2f,%3.2f,%3.2f,%3.2f,%3.2f,%3.2f,%3.2f,%d;", quatReal, quatI, quatJ, quatK, accelX, accelY, accelZ, activityClassifier);
 }
 
 //Given a register value and a Q point, convert to float
@@ -1135,9 +1147,13 @@ int main(void)
     {	
 				if(readSuccess){
 						readSuccess = false;
-						SEGGER_RTT_printf(0,"%s \r\n", str);
-						//for(uint8_t i = 0; i < 23; i++)SEGGER_RTT_printf(0,"%d, ", (char)str[i]);
-						//SEGGER_RTT_printf(0,"\r\n");
+						if(sampleTimes == 0)
+						{
+								sendData(str, sizeof(str));
+								SEGGER_RTT_printf(0,"%s \r\n", str);
+						}
+						sampleTimes++;
+						if(sampleTimes == 2)sampleTimes = 0;
 						err_code = nrf_drv_twi_rx(&m_twi_bno, BNO_ADDRESS, (uint8_t*)&cargo, sizeof(cargo));
 						APP_ERROR_CHECK(err_code);
 				}

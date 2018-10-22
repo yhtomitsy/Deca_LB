@@ -45,15 +45,15 @@ ool requestProductID();                                    // request the produc
   		int s = 0;
 ..\..\..\main.c(806): warning:  #550-D: variable "err_code" was set but never used
   		ret_code_t err_code;
-..\..\..\main.c(939): warning:  #177-D: variable "err_code" was declared but never referenced
+..\..\..\main.c(950): warning:  #177-D: variable "err_code" was declared but never referenced
   		ret_code_t err_code;
-..\..\..\main.c(996): warning:  #177-D: variable "status" was declared but never referenced
+..\..\..\main.c(1007): warning:  #177-D: variable "status" was declared but never referenced
     uint8_t status = shtpData[5 + 2] & 0x03; //Get status bits
-..\..\..\main.c(1000): warning:  #550-D: variable "data4" was set but never used
+..\..\..\main.c(1011): warning:  #550-D: variable "data4" was set but never used
     uint16_t data4 = 0;
-..\..\..\main.c(1001): warning:  #550-D: variable "data5" was set but never used
+..\..\..\main.c(1012): warning:  #550-D: variable "data5" was set but never used
     uint16_t data5 = 0;
-..\..\..\main.c(1099): warning:  #177-D: variable "erase_bonds" was declared but never referenced
+..\..\..\main.c(1110): warning:  #177-D: variable "erase_bonds" was declared but never referenced
       bool erase_bonds;
 ..\..\..\main.c(175): warning:  #177-D: variable "q0" was declared but never referenced
   static float q0,q1,q2,q3;                                		// quaternions q0 = qw 1 = i; 2 = j; 3 = k;
@@ -67,10 +67,6 @@ ool requestProductID();                                    // request the produc
   static float h_est;                                      		// heading accurracy estimation
 ..\..\..\main.c(177): warning:  #550-D: variable "stat_" was set but never used
   static uint8_t stat_;                                    		// Status (0-3)
-..\..\..\main.c(188): warning:  #177-D: variable "activityClassifier" was declared but never referenced
-  static float activityClassifier = 0;
-..\..\..\main.c(197): warning:  #177-D: variable "sampleTimes" was declared but never referenced
-  static uint8_t sampleTimes = 0;
 ..\..\..\main.c(200): warning:  #177-D: function "set_feature_cmd_QUAT" was declared but never referenced
   static void set_feature_cmd_QUAT(); 												// configure quaternion output
 ..\..\..\main.c(202): warning:  #177-D: function "sendPacket_IMU" was declared but never referenced
@@ -79,11 +75,11 @@ ool requestProductID();                                    // request the produc
   static void sendData(uint8_t array[], uint8_t arraySize){
 ..\..\..\main.c(698): warning:  #177-D: function "buttons_leds_init" was declared but never referenced
   static void buttons_leds_init(bool * p_erase_bonds)
-..\..\..\main.c: 25 warnings, 0 errors
+..\..\..\main.c: 23 warnings, 0 errors
 linking...
-Program Size: Code=25920 RO-data=932 RW-data=376 ZI-data=7432  
+Program Size: Code=26324 RO-data=936 RW-data=376 ZI-data=7432  
 FromELF: creating hex file...
-".\_build\nrf51422_xxac_s130.axf" - 0 Error(s), 25 Warning(s).
+".\_build\nrf51422_xxac_s130.axf" - 0 Error(s), 23 Warning(s).
 
 <h2>Software Packages used:</h2>
 
