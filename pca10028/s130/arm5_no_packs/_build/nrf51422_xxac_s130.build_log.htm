@@ -39,21 +39,21 @@ compiling main.c...
 ool requestProductID();                                    // request the product ID
 ..\..\..\main.c(207): warning:  #1295-D: Deprecated declaration parseData - give arg types
   void parseData();																						// get data from incoming packets
-..\..\..\main.c(290): warning:  #177-D: variable "buff1" was declared but never referenced
-  		uint8_t buff1[20] = {0};
-..\..\..\main.c(735): warning:  #177-D: variable "s" was declared but never referenced
+..\..\..\main.c(291): warning:  #177-D: variable "buff2" was declared but never referenced
+  		uint8_t buff2[4] = {0, 0, 0, 0};
+..\..\..\main.c(756): warning:  #177-D: variable "s" was declared but never referenced
   		int s = 0;
-..\..\..\main.c(806): warning:  #550-D: variable "err_code" was set but never used
+..\..\..\main.c(827): warning:  #550-D: variable "err_code" was set but never used
   		ret_code_t err_code;
-..\..\..\main.c(950): warning:  #177-D: variable "err_code" was declared but never referenced
+..\..\..\main.c(971): warning:  #177-D: variable "err_code" was declared but never referenced
   		ret_code_t err_code;
-..\..\..\main.c(1007): warning:  #177-D: variable "status" was declared but never referenced
+..\..\..\main.c(1028): warning:  #177-D: variable "status" was declared but never referenced
     uint8_t status = shtpData[5 + 2] & 0x03; //Get status bits
-..\..\..\main.c(1011): warning:  #550-D: variable "data4" was set but never used
+..\..\..\main.c(1032): warning:  #550-D: variable "data4" was set but never used
     uint16_t data4 = 0;
-..\..\..\main.c(1012): warning:  #550-D: variable "data5" was set but never used
+..\..\..\main.c(1033): warning:  #550-D: variable "data5" was set but never used
     uint16_t data5 = 0;
-..\..\..\main.c(1110): warning:  #177-D: variable "erase_bonds" was declared but never referenced
+..\..\..\main.c(1131): warning:  #177-D: variable "erase_bonds" was declared but never referenced
       bool erase_bonds;
 ..\..\..\main.c(175): warning:  #177-D: variable "q0" was declared but never referenced
   static float q0,q1,q2,q3;                                		// quaternions q0 = qw 1 = i; 2 = j; 3 = k;
@@ -71,15 +71,13 @@ ool requestProductID();                                    // request the produc
   static void set_feature_cmd_QUAT(); 												// configure quaternion output
 ..\..\..\main.c(202): warning:  #177-D: function "sendPacket_IMU" was declared but never referenced
   static void sendPacket_IMU(uint8_t, uint8_t);               // send data to IMU
-..\..\..\main.c(288): warning:  #177-D: function "sendData" was declared but never referenced
-  static void sendData(uint8_t array[], uint8_t arraySize){
-..\..\..\main.c(698): warning:  #177-D: function "buttons_leds_init" was declared but never referenced
+..\..\..\main.c(719): warning:  #177-D: function "buttons_leds_init" was declared but never referenced
   static void buttons_leds_init(bool * p_erase_bonds)
-..\..\..\main.c: 23 warnings, 0 errors
+..\..\..\main.c: 22 warnings, 0 errors
 linking...
-Program Size: Code=26324 RO-data=936 RW-data=376 ZI-data=7432  
+Program Size: Code=26468 RO-data=936 RW-data=376 ZI-data=7432  
 FromELF: creating hex file...
-".\_build\nrf51422_xxac_s130.axf" - 0 Error(s), 23 Warning(s).
+".\_build\nrf51422_xxac_s130.axf" - 0 Error(s), 22 Warning(s).
 
 <h2>Software Packages used:</h2>
 

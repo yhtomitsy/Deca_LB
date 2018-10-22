@@ -289,8 +289,9 @@ static void sendData(uint8_t array[], uint8_t arraySize){
 		uint32_t       err_code;
 		uint8_t buff1[20] = {0};
 		uint8_t buff2[4] = {0, 0, 0, 0};
+		uint8_t packetNumber = 0;
 		
-		if(str[20] == 0 && str[21] == 0 && str[22] == 0 && str[23] == 0) err_code = ble_nus_string_send(&m_nus, array, BLE_NUS_MAX_DATA_LEN);
+		/*if(str[20] == 0 && str[21] == 0 && str[22] == 0 && str[23] == 0) err_code = ble_nus_string_send(&m_nus, array, BLE_NUS_MAX_DATA_LEN);
 		else
 		{
 				
@@ -306,8 +307,26 @@ static void sendData(uint8_t array[], uint8_t arraySize){
 						}
 				}
 				
+		}*/
+		for(uint8_t i = 0; i < arraySize; i++)
+		{
+				if(i != 0 && i % 20 == 0){
+						packetNumber++;
+						SEGGER_RTT_printf(0,"Packet Number: %d\n", packetNumber);
+						err_code = ble_nus_string_send(&m_nus, buff1, BLE_NUS_MAX_DATA_LEN);
+						//nrf_delay_ms(1);
+						//APP_ERROR_CHECK(err_code);
+				}
+				buff1[i - (packetNumber * 20)] = array[i];
+				if((char)array[i] == ';')
+				{
+						err_code = ble_nus_string_send(&m_nus, buff1, i - (packetNumber * 20) + 1);
+						break;
+						//nrf_delay_ms(1);
+						//APP_ERROR_CHECK(err_code);
+				}
+				
 		}
-		//for(uint8_t i = 0; i < arraySize)
 		////SEGGER_RTT_printf(0,"DS\n");
 		//err_code != BLE_ERROR_NO_TX_BUFFERS
 		if (err_code != NRF_SUCCESS &&
@@ -463,6 +482,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
 								//SEGGER_RTT_printf(0,"\r\nInitial data submission!\r\n");
 								//sendData(str, sizeof(str));
 						}
+						nrf_delay_ms(1000);
             break;
             
         case BLE_GAP_EVT_DISCONNECTED:
@@ -1149,8 +1169,8 @@ int main(void)
 						readSuccess = false;
 						if(sampleTimes == 0)
 						{
-								sendData(str, sizeof(str));
-								SEGGER_RTT_printf(0,"%s \r\n", str);
+								if(TX_Complete)sendData(str, sizeof(str));
+								//SEGGER_RTT_printf(0,"%s \r\n", str);
 						}
 						sampleTimes++;
 						if(sampleTimes == 2)sampleTimes = 0;
